@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MoneyPot – Multi-Spend Group Fund</title>
+  <!-- 引入 ethers.js v6 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background-color: #020617;
+      color: #e5e7eb;
+    }
+
+    header {
+      padding: 16px 32px;
+      border-bottom: 1px solid #1f2937;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .title {
+      flex: 1;
+      text-align: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: #f9fafb;
+    }
+
+    .wallet-box {
+      min-width: 260px;
+      text-align: right;
+      font-size: 13px;
+    }
+
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    button:hover {
+      background-color: #1d4ed8;
+    }
+
+    button:disabled {
+      background-color: #4b5563;
+      cursor: not-allowed;
+    }
+
+    .muted {
+      color: #9ca3af;
+      font-size: 12px;
+    }
+
+    .container {
+      display: flex;
+      padding: 24px 32px;
+      gap: 24px;
+    }
+
+    .panel {
+      background-color: #020617;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      padding: 16px;
+    }
+
+    .left-panel {
+      width: 32%;
+      min-width: 280px;
+    }
+
+    .right-panel {
+      flex: 1;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      border-bottom: 1px solid #1f2937;
+      padding-bottom: 8px;
+    }
+
+    .section {
+      margin-bottom: 16px;
+    }
+
+    .label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #374151;
+      background-color: #020617;
+      color: #e5e7eb;
+      font-size: 13px;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 50px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .row > div {
+      flex: 1;
+    }
+
+    .value {
+      font-weight: 600;
+      font-size: 13px;
+      word-break: break-all;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      background-color: #111827;
+      border: 1px solid #1f2937;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+
+    .list {
+      max-height: 260px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .pot-card {
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      padding: 8px 10px;
+      background-color: #020617;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .pot-card.active {
+      border-color: #3b82f6;
+      background-color: #030712;
+    }
+
+    .pot-title {
+      font-weight: 600;
+    }
+
+    .tag {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .requests-list {
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .request-card {
+      border-radius: 8px;
+      border: 1px solid #1f2937;
+      padding: 8px;
+      background-color: #020617;
+      font-size: 12px;
+    }
+
+    .inline-buttons {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .small-btn {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    .status-open {
+      color: #22c55e;
+      font-weight: 600;
+    }
+
+    .status-closed {
+      color: #f97316;
+      font-weight: 600;
+    }
+
+    code {
+      font-size: 11px;
+      background-color: #030712;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div style="width:260px;"></div>
+  <div class="title">MoneyPot – Group Fund DApp</div>
+  <div class="wallet-box">
+    <div>
+      <button id="connectButton">Connect Wallet</button>
+    </div>
+    <div class="muted">
+      Address: <span id="accountAddress">Not connected</span>
+    </div>
+    <div class="muted">
+      Network: <span id="networkName">-</span>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <!-- 左侧：创建 pot + pot 列表 -->
+  <div class="panel left-panel">
+    <h2>Create & Select Pots</h2>
+
+    <!-- 创建 pot -->
+    <div class="section">
+      <div class="label">New Pot Name</div>
+      <input type="text" id="createPotName" placeholder="e.g. Hiking Fund" />
+
+      <div class="label" style="margin-top:8px;">Approver Addresses (comma-separated)</div>
+      <textarea id="createPotApprovers" placeholder="0xAAA...,0xBBB...,0xCCC..."></textarea>
+
+      <div class="label" style="margin-top:8px;">Min Approvals (m in m-of-n)</div>
+      <input type="number" id="createPotMinApprovals" placeholder="e.g. 2" />
+
+      <div style="margin-top:10px;">
+        <button id="createPotButton">Create Pot</button>
+      </div>
+      <div class="muted" style="margin-top:6px;">
+        Creator defines who can approve spending (approvers) and how many approvals are needed (m-of-n).
+      </div>
+    </div>
+
+    <!-- 已有 pot 列表（通过 potId 载入） -->
+    <div class="section">
+      <div class="label">Load Pot by ID</div>
+      <div class="row">
+        <div>
+          <input type="number" id="loadPotId" placeholder="0" />
+        </div>
+        <div style="align-self:flex-end;">
+          <button id="loadPotButton">Load</button>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:4px;">
+        Pot IDs start from 0. Total pots: <span id="potCountLabel">-</span>
+      </div>
+    </div>
+
+    <!-- 简单 pot 列表（最近几个） -->
+    <div class="section">
+      <div class="label">Recent Pots</div>
+      <div id="potList" class="list">
+        <!-- 动态填充 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 右侧：Pot 详情 + 存款 + 支出请求 -->
+  <div class="panel right-panel">
+    <h2>Pot Detail</h2>
+
+    <!-- Pot 基本信息 -->
+    <div class="section">
+      <div class="label">Selected Pot</div>
+      <div class="value" id="detailPotTitle">No pot selected</div>
+      <div class="muted" id="detailPotId"></div>
+    </div>
+
+    <div class="section row">
+      <div>
+        <span class="label">Creator</span>
+        <span class="value" id="detailCreator">-</span>
+      </div>
+      <div>
+        <span class="label">Created At</span>
+        <span class="value" id="detailCreatedAt">-</span>
+      </div>
+    </div>
+
+    <div class="section row">
+      <div>
+        <span class="label">Total Balance (ETH)</span>
+        <span class="value" id="detailBalance">-</span>
+      </div>
+      <div>
+        <span class="label">Status</span>
+        <span class="value" id="detailStatus">-</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="label">Approvers & Threshold</div>
+      <div class="value" id="detailApprovers">-</div>
+      <div class="muted" id="detailThreshold"></div>
+    </div>
+
+    <!-- 当前用户角色 -->
+    <div class="section">
+      <div class="label">Your Role (for this pot)</div>
+      <div class="value" id="detailRole">-</div>
+    </div>
+
+    <!-- 存款 -->
+    <div class="section">
+      <div class="label">Deposit to this Pot (Join / Add more)</div>
+      <div class="row">
+        <div>
+          <input type="text" id="depositAmount" placeholder="e.g. 0.01 (ETH)" />
+        </div>
+        <div style="align-self:flex-end;">
+          <button id="depositButton">Deposit</button>
+        </div>
+      </div>
+      <div class="muted" style="margin-top:4px;">
+        Anyone can deposit into a pot and become a contributor.
+      </div>
+    </div>
+
+    <hr style="border-color:#1f2937; margin:16px 0;" />
+
+    <!-- 创建支出请求 -->
+    <div class="section">
+      <div class="label">Create Withdraw Request (Spending Proposal)</div>
+      <div class="row">
+        <div>
+          <span class="label">To (receiver address)</span>
+          <input type="text" id="wrTo" placeholder="0x..." />
+        </div>
+        <div>
+          <span class="label">Amount (ETH)</span>
+          <input type="text" id="wrAmount" placeholder="0.01" />
+        </div>
+      </div>
+      <div style="margin-top:6px;">
+        <span class="label">Description</span>
+        <textarea id="wrDescription" placeholder="e.g. Tickets for hiking"></textarea>
+      </div>
+      <div style="margin-top:8px;">
+        <button id="createRequestButton">Create Request</button>
+      </div>
+      <div class="muted" style="margin-top:4px;">
+        By default anyone can propose a spending request; only approvers can approve it.
+      </div>
+    </div>
+
+    <!-- 支出请求列表 -->
+    <div class="section">
+      <div class="label">Withdraw Requests</div>
+      <div id="requestsList" class="requests-list">
+        <!-- 动态填充 -->
+      </div>
+      <div class="muted" id="requestsHint">
+        No requests yet.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============ 配置区 ============
+  // 部署合约以后，把地址贴这里：
+  const CONTRACT_ADDRESS = "0xf535037702CdC4d630719c405c2f3Ed479D442EB";
+
+  // 建议：编译合约后，从 Remix 复制 ABI，替换下面 []
+  // 这里只放几个关键函数示意，你实际要用完整 ABI
+  const CONTRACT_ABI = [
+    // potCount
+    {
+      "inputs": [],
+      "name": "potCount",
+      "outputs": [{"internalType":"uint256","name":"","type":"uint256"}],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    // createPot
+    {
+      "inputs": [
+        {"internalType":"string","name":"name","type":"string"},
+        {"internalType":"address[]","name":"approvers","type":"address[]"},
+        {"internalType":"uint256","name":"minApprovals","type":"uint256"}
+      ],
+      "name": "createPot",
+      "outputs":[{"internalType":"uint256","name":"potId","type":"uint256"}],
+      "stateMutability":"nonpayable",
+      "type":"function"
+    },
+    // deposit
+    {
+      "inputs":[{"internalType":"uint256","name":"potId","type":"uint256"}],
+      "name":"deposit",
+      "outputs":[],
+      "stateMutability":"payable",
+      "type":"function"
+    },
+    // getPotInfo
+    {
+      "inputs":[{"internalType":"uint256","name":"potId","type":"uint256"}],
+      "name":"getPotInfo",
+      "outputs":[
+        {"internalType":"string","name":"name","type":"string"},
+        {"internalType":"address","name":"creator","type":"address"},
+        {"internalType":"uint256","name":"totalDeposited","type":"uint256"},
+        {"internalType":"uint256","name":"createdAt","type":"uint256"},
+        {"internalType":"bool","name":"isClosed","type":"bool"},
+        {"internalType":"uint256","name":"approverCount","type":"uint256"},
+        {"internalType":"uint256","name":"minApprovals","type":"uint256"}
+      ],
+      "stateMutability":"view",
+      "type":"function"
+    },
+    // getApprovers
+    {
+      "inputs":[{"internalType":"uint256","name":"potId","type":"uint256"}],
+      "name":"getApprovers",
+      "outputs":[{"internalType":"address[]","name":"","type":"address[]"}],
+      "stateMutability":"view",
+      "type":"function"
+    },
+    // contributions (public mapping)
+    {
+      "inputs":[
+        {"internalType":"uint256","name":"potId","type":"uint256"},
+        {"internalType":"address","name":"","type":"address"}
+      ],
+      "name":"contributions",
+      "outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
+      "stateMutability":"view",
+      "type":"function"
+    },
+    // getWithdrawRequestCount
+    {
+      "inputs":[{"internalType":"uint256","name":"potId","type":"uint256"}],
+      "name":"getWithdrawRequestCount",
+      "outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
+      "stateMutability":"view",
+      "type":"function"
+    },
+    // getWithdrawRequest
+    {
+      "inputs":[
+        {"internalType":"uint256","name":"potId","type":"uint256"},
+        {"internalType":"uint256","name":"requestId","type":"uint256"}
+      ],
+      "name":"getWithdrawRequest",
+      "outputs":[
+        {"internalType":"address","name":"proposer","type":"address"},
+        {"internalType":"address","name":"to","type":"address"},
+        {"internalType":"uint256","name":"amount","type":"uint256"},
+        {"internalType":"string","name":"description","type":"string"},
+        {"internalType":"uint256","name":"approvalCount","type":"uint256"},
+        {"internalType":"bool","name":"executed","type":"bool"}
+      ],
+      "stateMutability":"view",
+      "type":"function"
+    },
+    // createWithdrawRequest
+    {
+      "inputs":[
+        {"internalType":"uint256","name":"potId","type":"uint256"},
+        {"internalType":"address","name":"to","type":"address"},
+        {"internalType":"uint256","name":"amount","type":"uint256"},
+        {"internalType":"string","name":"description","type":"string"}
+      ],
+      "name":"createWithdrawRequest",
+      "outputs":[{"internalType":"uint256","name":"requestId","type":"uint256"}],
+      "stateMutability":"nonpayable",
+      "type":"function"
+    },
+    // approveWithdraw
+    {
+      "inputs":[
+        {"internalType":"uint256","name":"potId","type":"uint256"},
+        {"internalType":"uint256","name":"requestId","type":"uint256"}
+      ],
+      "name":"approveWithdraw",
+      "outputs":[],
+      "stateMutability":"nonpayable",
+      "type":"function"
+    },
+    // executeWithdraw
+    {
+      "inputs":[
+        {"internalType":"uint256","name":"potId","type":"uint256"},
+        {"internalType":"uint256","name":"requestId","type":"uint256"}
+      ],
+      "name":"executeWithdraw",
+      "outputs":[],
+      "stateMutability":"nonpayable",
+      "type":"function"
+    }
+  ];
+
+  // ============ 全局变量 ============
+  let provider;
+  let signer;
+  let contract;
+  let currentAccount = null;
+  let currentPotId = null;
+
+  // ============ 工具函数 ============
+  function shortAddr(addr) {
+    if (!addr) return "-";
+    return addr.slice(0, 6) + "..." + addr.slice(-4);
+  }
+
+  function formatEth(wei) {
+    try {
+      return ethers.formatEther(wei);
+    } catch {
+      return "0";
+    }
+  }
+
+  function formatTime(ts) {
+    if (!ts || ts === 0) return "-";
+    const d = new Date(Number(ts) * 1000);
+    return d.toLocaleString();
+  }
+
+  // ============ 初始化 & 连接钱包 ============
+  async function connectWallet() {
+    if (!window.ethereum) {
+      alert("Please install MetaMask.");
+      return;
+    }
+    provider = new ethers.BrowserProvider(window.ethereum);
+    const accounts = await provider.send("eth_requestAccounts", []);
+    currentAccount = accounts[0];
+
+    signer = await provider.getSigner();
+    contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+    document.getElementById("accountAddress").textContent = shortAddr(currentAccount);
+
+    const network = await provider.getNetwork();
+    document.getElementById("networkName").textContent = network.name || network.chainId.toString();
+
+    await refreshPotCount();
+    await loadRecentPots(3);
+
+    // 监听账户切换
+    window.ethereum.on("accountsChanged", async (accounts) => {
+      if (accounts.length === 0) {
+        currentAccount = null;
+        document.getElementById("accountAddress").textContent = "Not connected";
+      } else {
+        currentAccount = accounts[0];
+        signer = await provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        document.getElementById("accountAddress").textContent = shortAddr(currentAccount);
+        if (currentPotId !== null) {
+          await loadPot(currentPotId);
+        }
+      }
+    });
+  }
+
+  async function refreshPotCount() {
+    if (!contract) return;
+    const count = await contract.potCount();
+    document.getElementById("potCountLabel").textContent = count.toString();
+  }
+
+  // ============ Pot 相关 ============
+  async function createPot() {
+    if (!contract || !currentAccount) {
+      alert("Connect wallet first.");
+      return;
+    }
+
+    const name = document.getElementById("createPotName").value.trim();
+    const approversRaw = document.getElementById("createPotApprovers").value.trim();
+    const minApprovals = document.getElementById("createPotMinApprovals").value.trim();
+
+    if (!name || !approversRaw || !minApprovals) {
+      alert("Please fill name, approvers and min approvals.");
+      return;
+    }
+
+    const approvers = approversRaw
+      .split(",")
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    try {
+      const tx = await contract.createPot(name, approvers, BigInt(minApprovals));
+      await tx.wait();
+      alert("Pot created!");
+      await refreshPotCount();
+      await loadRecentPots(3);
+    } catch (err) {
+      console.error(err);
+      alert("Create pot failed: " + (err.reason || err.message));
+    }
+  }
+
+  async function loadPot(potId) {
+    if (!contract) {
+      alert("Connect wallet first.");
+      return;
+    }
+    try {
+      const id = BigInt(potId);
+      const info = await contract.getPotInfo(id);
+      const approvers = await contract.getApprovers(id);
+
+      currentPotId = id;
+
+      const [name, creator, totalDeposited, createdAt, isClosed, approverCount, minApprovals] = info;
+
+      document.getElementById("detailPotTitle").textContent = name;
+      document.getElementById("detailPotId").textContent = "Pot ID: " + id.toString();
+      document.getElementById("detailCreator").textContent = shortAddr(creator);
+      document.getElementById("detailCreatedAt").textContent = formatTime(createdAt);
+      document.getElementById("detailBalance").textContent = formatEth(totalDeposited);
+      document.getElementById("detailStatus").innerHTML = isClosed ? '<span class="status-closed">Closed</span>' : '<span class="status-open">Open</span>';
+      document.getElementById("detailThreshold").textContent =
+        `Approvers: ${approverCount.toString()} | Min approvals: ${minApprovals.toString()}`;
+
+      // 显示 approvers
+      const approverContainer = document.getElementById("detailApprovers");
+      approverContainer.innerHTML = "";
+      approvers.forEach(a => {
+        const span = document.createElement("span");
+        span.className = "pill";
+        span.textContent = shortAddr(a);
+        approverContainer.appendChild(span);
+      });
+
+      // 当前用户角色
+      let role = "Visitor";
+      if (currentAccount) {
+        const isAppr = approvers.some(a => a.toLowerCase() === currentAccount.toLowerCase());
+        const contrib = await contract.contributions(id, currentAccount);
+        const isMember = contrib > 0n;
+        if (isAppr && isMember) role = "Approver & Contributor";
+        else if (isAppr) role = "Approver";
+        else if (isMember) role = "Contributor";
+      }
+      document.getElementById("detailRole").textContent = role;
+
+      // 刷新请求列表
+      await loadRequests(id);
+
+      // 高亮左侧列表中的当前 pot
+      highlightActivePotCard(id);
+
+    } catch (err) {
+      console.error(err);
+      alert("Load pot failed: " + (err.reason || err.message));
+    }
+  }
+
+  async function loadRecentPots(limit) {
+    if (!contract) return;
+    const count = await contract.potCount();
+    const listDiv = document.getElementById("potList");
+    listDiv.innerHTML = "";
+
+    const total = Number(count);
+    if (total === 0) {
+      listDiv.innerHTML = '<div class="muted">No pots yet. Create one above.</div>';
+      return;
+    }
+
+    const start = Math.max(0, total - limit);
+    for (let i = total - 1; i >= start; i--) {
+      try {
+        const info = await contract.getPotInfo(i);
+        const [name, creator, totalDeposited, createdAt, isClosed] = info;
+        const card = document.createElement("div");
+        card.className = "pot-card";
+        card.dataset.potId = i.toString();
+
+        card.innerHTML = `
+          <div class="pot-title">${name}</div>
+          <div class="tag">ID: ${i} | Balance: ${formatEth(totalDeposited)} ETH</div>
+          <div class="muted">Creator: ${shortAddr(creator)}</div>
+        `;
+
+        card.onclick = () => loadPot(i);
+        listDiv.appendChild(card);
+      } catch (e) {
+        console.error("Error loading pot", i, e);
+      }
+    }
+  }
+
+  function highlightActivePotCard(potId) {
+    const cards = document.querySelectorAll(".pot-card");
+    cards.forEach(c => {
+      if (c.dataset.potId === potId.toString()) {
+        c.classList.add("active");
+      } else {
+        c.classList.remove("active");
+      }
+    });
+  }
+
+  // ============ 存款 ============
+  async function depositToPot() {
+    if (!contract || currentPotId === null) {
+      alert("Select a pot first.");
+      return;
+    }
+    const amtStr = document.getElementById("depositAmount").value.trim();
+    if (!amtStr) {
+      alert("Enter amount in ETH.");
+      return;
+    }
+    try {
+      const valueWei = ethers.parseEther(amtStr);
+      const tx = await contract.deposit(currentPotId, { value: valueWei });
+      await tx.wait();
+      alert("Deposit success!");
+      await loadPot(currentPotId);
+      await refreshPotCount();
+    } catch (err) {
+      console.error(err);
+      alert("Deposit failed: " + (err.reason || err.message));
+    }
+  }
+
+  // ============ 支出请求：创建 / 审批 / 执行 ============
+  async function createWithdrawRequest() {
+    if (!contract || currentPotId === null) {
+      alert("Select a pot first.");
+      return;
+    }
+    const to = document.getElementById("wrTo").value.trim();
+    const amountStr = document.getElementById("wrAmount").value.trim();
+    const desc = document.getElementById("wrDescription").value.trim();
+
+    if (!to || !amountStr) {
+      alert("Please fill receiver and amount.");
+      return;
+    }
+
+    try {
+      const amountWei = ethers.parseEther(amountStr);
+      const tx = await contract.createWithdrawRequest(currentPotId, to, amountWei, desc);
+      await tx.wait();
+      alert("Withdraw request created.");
+      await loadRequests(currentPotId);
+    } catch (err) {
+      console.error(err);
+      alert("Create request failed: " + (err.reason || err.message));
+    }
+  }
+
+  async function loadRequests(potId) {
+    const listDiv = document.getElementById("requestsList");
+    const hint = document.getElementById("requestsHint");
+    listDiv.innerHTML = "";
+
+    if (!contract) return;
+
+    try {
+      const count = await contract.getWithdrawRequestCount(potId);
+      const total = Number(count);
+
+      if (total === 0) {
+        hint.textContent = "No requests yet.";
+        return;
+      }
+      hint.textContent = "";
+
+      // 为判断 approver 角色用
+      const approvers = await contract.getApprovers(potId);
+      const isApprover = currentAccount &&
+        approvers.some(a => a.toLowerCase() === currentAccount.toLowerCase());
+
+      for (let i = 0; i < total; i++) {
+        const req = await contract.getWithdrawRequest(potId, i);
+        const [proposer, to, amount, description, approvalCount, executed] = req;
+
+        const card = document.createElement("div");
+        card.className = "request-card";
+
+        card.innerHTML = `
+          <div><strong>Request #${i}</strong> – ${executed ? '<span class="status-closed">Executed</span>' : '<span class="status-open">Pending</span>'}</div>
+          <div>To: <code>${shortAddr(to)}</code></div>
+          <div>Amount: <strong>${formatEth(amount)} ETH</strong></div>
+          <div class="muted">By: ${shortAddr(proposer)}</div>
+          <div class="muted">Approvals: ${approvalCount.toString()}</div>
+          <div class="muted">Note: ${description || '(no description)'}</div>
+        `;
+
+        const btnRow = document.createElement("div");
+        btnRow.className = "inline-buttons";
+
+        // Approve 按钮：只给 approver 看，且未执行时
+        if (isApprover && !executed) {
+          const approveBtn = document.createElement("button");
+          approveBtn.className = "small-btn";
+          approveBtn.textContent = "Approve";
+          approveBtn.onclick = () => approveWithdraw(potId, i);
+          btnRow.appendChild(approveBtn);
+        }
+
+        // Execute 按钮：任何人都能调用，只要未执行
+        if (!executed) {
+          const execBtn = document.createElement("button");
+          execBtn.className = "small-btn";
+          execBtn.textContent = "Execute";
+          execBtn.onclick = () => executeWithdraw(potId, i);
+          btnRow.appendChild(execBtn);
+        }
+
+        card.appendChild(btnRow);
+        listDiv.appendChild(card);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Load requests failed: " + (err.reason || err.message));
+    }
+  }
+
+  async function approveWithdraw(potId, requestId) {
+    if (!contract) return;
+    try {
+      const tx = await contract.approveWithdraw(potId, requestId);
+      await tx.wait();
+      alert("Approved.");
+      await loadRequests(potId);
+    } catch (err) {
+      console.error(err);
+      alert("Approve failed: " + (err.reason || err.message));
+    }
+  }
+
+  async function executeWithdraw(potId, requestId) {
+    if (!contract) return;
+    try {
+      const tx = await contract.executeWithdraw(potId, requestId);
+      await tx.wait();
+      alert("Withdraw executed.");
+      await loadPot(potId);
+      await loadRequests(potId);
+    } catch (err) {
+      console.error(err);
+      alert("Execute failed: " + (err.reason || err.message));
+    }
+  }
+
+  // ============ 绑定事件 ============
+  document.getElementById("connectButton").onclick = connectWallet;
+  document.getElementById("createPotButton").onclick = createPot;
+  document.getElementById("loadPotButton").onclick = () => {
+    const pid = document.getElementById("loadPotId").value.trim();
+    if (pid === "") {
+      alert("Enter pot ID.");
+      return;
+    }
+    loadPot(pid);
+  };
+  document.getElementById("depositButton").onclick = depositToPot;
+  document.getElementById("createRequestButton").onclick = createWithdrawRequest;
+</script>
+</body>
+</html>
